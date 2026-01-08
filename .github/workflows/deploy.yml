@@ -24,9 +24,10 @@ jobs:
           distribution: 'zulu'
           java-version: 17
       - name: Run MUnit Tests
-        env:
-          ANYPOINT_CLIENT_CREDENTIALS: ${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}
-        run: mvn test --file pom.xml -s .maven/settings.xml
+        run: |
+          mvn test --file pom.xml \
+            -s .maven/settings.xml \
+            -Dmule.server.password="${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}"
 
   package:
     needs: build
@@ -47,9 +48,10 @@ jobs:
           distribution: 'zulu'
           java-version: 17
       - name: Build with Maven
-        env:
-          ANYPOINT_CLIENT_CREDENTIALS: ${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}
-        run: mvn -B package --file pom.xml -DskipMunitTests -s .maven/settings.xml
+        run: |
+          mvn -B package --file pom.xml -DskipMunitTests \
+            -s .maven/settings.xml \
+            -Dmule.server.password="${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}"
       - name: Stamp artifact file name with commit hash
         run: |
           artifactName1=$(ls target/*.jar | head -1)
@@ -85,20 +87,18 @@ jobs:
         with:
           name: artifacts
       - name: Deploy to Exchange
-        env:
-          ANYPOINT_CLIENT_CREDENTIALS: ${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}
         run: |
           artifactName=$(ls *.jar | head -1)
           mvn deploy -DskipMunitTests \
             -Dmule.artifact=$artifactName \
-            -s .maven/settings.xml
+            -s .maven/settings.xml \
+            -Dmule.server.password="${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}"
       - name: Deploy to Sandbox
-        env:
-          ANYPOINT_CLIENT_CREDENTIALS: ${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}
         run: |
           artifactName=$(ls *.jar | head -1)
           mvn deploy -DskipMunitTests -DmuleDeploy \
             -Dmule.artifact=$artifactName \
+            -s .maven/settings.xml \
+            -Dmule.server.password="${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}" \
             -Dclient.id="${{ secrets.CONNECTED_APP_ID }}" \
-            -Dclient.secret="${{ secrets.CONNECTED_APP_SECRET }}" \
-            -s .maven/settings.xml
+            -Dclient.secret="${{ secrets.CONNECTED_APP_SECRET }}"
