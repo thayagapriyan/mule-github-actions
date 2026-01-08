@@ -23,6 +23,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.branch }}
+      - name: Validate branch name
+        run: |
+          BRANCH="${{ github.event.inputs.branch }}"
+          echo "Branch name: $BRANCH"
+          if [[ ! "$BRANCH" == feature/* ]]; then
+            echo "❌ Error: Branch '$BRANCH' is not a feature branch!"
+            echo "Only feature branches (feature/*) can be deployed using this workflow"
+            exit 1
+          fi
+          echo "✅ Branch validation passed: $BRANCH"
       - name: Validate SNAPSHOT version
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
