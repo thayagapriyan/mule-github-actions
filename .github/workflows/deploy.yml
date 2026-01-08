@@ -75,6 +75,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: artifacts
+      - name: Deploy to Exchange
+        env:
+          ID: ${{ secrets.CONNECTED_APP_ID }}
+          SECRET: ${{ secrets.CONNECTED_APP_SECRET }}
+        run: |
+          artifactName=$(ls *.jar | head -1)
+          mvn deploy -DskipMunitTests \
+            -Dmule.artifact=$artifactName \
+            -Dclient.id="$ID" \
+            -Dclient.secret="$SECRET"
       - name: Deploy to Sandbox
         env:
           ID: ${{ secrets.CONNECTED_APP_ID }}
