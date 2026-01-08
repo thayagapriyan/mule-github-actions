@@ -27,7 +27,8 @@ jobs:
         run: |
           mvn test --file pom.xml \
             -s .maven/settings.xml \
-            -Dmule.server.password="${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}"
+            -Dmule.client.id="${{ secrets.CONNECTED_APP_ID }}" \
+            -Dmule.client.secret="${{ secrets.CONNECTED_APP_SECRET }}"
 
   package:
     needs: build
@@ -51,7 +52,8 @@ jobs:
         run: |
           mvn -B package --file pom.xml -DskipMunitTests \
             -s .maven/settings.xml \
-            -Dmule.server.password="${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}"
+            -Dmule.client.id="${{ secrets.CONNECTED_APP_ID }}" \
+            -Dmule.client.secret="${{ secrets.CONNECTED_APP_SECRET }}"
       - name: Stamp artifact file name with commit hash
         run: |
           artifactName1=$(ls target/*.jar | head -1)
@@ -92,13 +94,15 @@ jobs:
           mvn deploy -DskipMunitTests \
             -Dmule.artifact=$artifactName \
             -s .maven/settings.xml \
-            -Dmule.server.password="${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}"
+            -Dmule.client.id="${{ secrets.CONNECTED_APP_ID }}" \
+            -Dmule.client.secret="${{ secrets.CONNECTED_APP_SECRET }}"
       - name: Deploy to Sandbox
         run: |
           artifactName=$(ls *.jar | head -1)
           mvn deploy -DskipMunitTests -DmuleDeploy \
             -Dmule.artifact=$artifactName \
             -s .maven/settings.xml \
-            -Dmule.server.password="${{ secrets.CONNECTED_APP_ID }}~${{ secrets.CONNECTED_APP_SECRET }}" \
+            -Dmule.client.id="${{ secrets.CONNECTED_APP_ID }}" \
+            -Dmule.client.secret="${{ secrets.CONNECTED_APP_SECRET }}" \
             -Dclient.id="${{ secrets.CONNECTED_APP_ID }}" \
             -Dclient.secret="${{ secrets.CONNECTED_APP_SECRET }}"
