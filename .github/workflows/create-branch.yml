@@ -37,7 +37,7 @@ jobs:
         run: |
           BRANCH_TYPE="${{ github.event.inputs.branch_type }}"
           BRANCH_NAME="${{ github.event.inputs.branch_name }}"
-          NEW_BRANCH="${BRANCH_TYPE}/${BRANCH_NAME}"
+          NEW_BRANCH="${BRANCH_NAME}"
           
           echo "Creating branch: $NEW_BRANCH"
           
