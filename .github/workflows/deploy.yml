@@ -106,3 +106,26 @@ jobs:
             -Dmule.client.secret="${{ secrets.CONNECTED_APP_SECRET }}" \
             -Dclient.id="${{ secrets.CONNECTED_APP_ID }}" \
             -Dclient.secret="${{ secrets.CONNECTED_APP_SECRET }}"
+      - name: Create Deployment Summary
+        run: |
+          artifactName=$(ls *.jar | head -1)
+          echo "## 🚀 MuleSoft Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Artifact Details" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Artifact** | \`$artifactName\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${GITHUB_SHA::7}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`$GITHUB_REF_NAME\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered By** | $GITHUB_ACTOR |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Deployment Targets" >> $GITHUB_STEP_SUMMARY
+          echo "| Target | Environment | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Anypoint Exchange | - | ✅ Deployed |" >> $GITHUB_STEP_SUMMARY
+          echo "| CloudHub 2.0 | Sandbox | ✅ Deployed |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Anypoint Platform](https://anypoint.mulesoft.com)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Runtime Manager](https://anypoint.mulesoft.com/cloudhub/#/console/home/applications)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Exchange](https://anypoint.mulesoft.com/exchange/)" >> $GITHUB_STEP_SUMMARY
