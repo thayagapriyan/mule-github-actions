@@ -1,0 +1,223 @@
+{
+  "coverage": 97.14285714285714,
+  "requiredApplicationCoverage": -1.0,
+  "requiredResourceCoverage": -1.0,
+  "requiredFlowCoverage": 80.0,
+  "flowCount": 6,
+  "processorCount": 35,
+  "coveredProcessorCount": 34,
+  "files": [
+    {
+      "name": "aip-dcr-interceptor-exp-api.xml",
+      "flowCount": 4,
+      "coverage": 95.23809523809524,
+      "processorCount": 21,
+      "weight": 60.0,
+      "flows": [
+        {
+          "name": "delete:\\register\\(clientId):aip-dcr-interceptor-exp-api-config",
+          "type": "FLOW",
+          "coverage": 100.0,
+          "messageProcessorCount": 6,
+          "coveredProcessorCount": 6,
+          "lines": [
+            {
+              "lineNumber": 68,
+              "covered": true
+            },
+            {
+              "lineNumber": 83,
+              "covered": true
+            },
+            {
+              "lineNumber": 64,
+              "covered": true
+            },
+            {
+              "lineNumber": 59,
+              "covered": true
+            },
+            {
+              "lineNumber": 67,
+              "covered": true
+            },
+            {
+              "lineNumber": 80,
+              "covered": true
+            }
+          ]
+        },
+        {
+          "name": "generate-bearer-token",
+          "type": "FLOW",
+          "coverage": 100.0,
+          "messageProcessorCount": 3,
+          "coveredProcessorCount": 3,
+          "lines": [
+            {
+              "lineNumber": 25,
+              "covered": true
+            },
+            {
+              "lineNumber": 39,
+              "covered": true
+            },
+            {
+              "lineNumber": 46,
+              "covered": true
+            }
+          ]
+        },
+        {
+          "name": "aip-dcr-interceptor-exp-api-main",
+          "type": "FLOW",
+          "coverage": 50.0,
+          "messageProcessorCount": 2,
+          "coveredProcessorCount": 1,
+          "lines": [
+            {
+              "lineNumber": 19,
+              "covered": false
+            },
+            {
+              "lineNumber": 16,
+              "covered": true
+            }
+          ]
+        },
+        {
+          "name": "post:\\register:application\\json:aip-dcr-interceptor-exp-api-config",
+          "type": "FLOW",
+          "coverage": 100.0,
+          "messageProcessorCount": 10,
+          "coveredProcessorCount": 10,
+          "lines": [
+            {
+              "lineNumber": 145,
+              "covered": true
+            },
+            {
+              "lineNumber": 96,
+              "covered": true
+            },
+            {
+              "lineNumber": 99,
+              "covered": true
+            },
+            {
+              "lineNumber": 87,
+              "covered": true
+            },
+            {
+              "lineNumber": 118,
+              "covered": true
+            },
+            {
+              "lineNumber": 131,
+              "covered": true
+            },
+            {
+              "lineNumber": 128,
+              "covered": true
+            },
+            {
+              "lineNumber": 134,
+              "covered": true
+            },
+            {
+              "lineNumber": 100,
+              "covered": true
+            },
+            {
+              "lineNumber": 121,
+              "covered": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "error-handling.xml",
+      "flowCount": 2,
+      "coverage": 100.0,
+      "processorCount": 14,
+      "weight": 40.0,
+      "flows": [
+        {
+          "name": "error-handling-message",
+          "type": "SUB_FLOW",
+          "coverage": 100.0,
+          "messageProcessorCount": 2,
+          "coveredProcessorCount": 2,
+          "lines": [
+            {
+              "lineNumber": 32,
+              "covered": true
+            },
+            {
+              "lineNumber": 9,
+              "covered": true
+            }
+          ]
+        },
+        {
+          "name": "aip-dcr-interceptor-error-handler",
+          "type": "ERROR_HANDLER",
+          "coverage": 100.0,
+          "messageProcessorCount": 12,
+          "coveredProcessorCount": 12,
+          "lines": [
+            {
+              "lineNumber": 108,
+              "covered": true
+            },
+            {
+              "lineNumber": 36,
+              "covered": true
+            },
+            {
+              "lineNumber": 92,
+              "covered": true
+            },
+            {
+              "lineNumber": 105,
+              "covered": true
+            },
+            {
+              "lineNumber": 118,
+              "covered": true
+            },
+            {
+              "lineNumber": 95,
+              "covered": true
+            },
+            {
+              "lineNumber": 121,
+              "covered": true
+            },
+            {
+              "lineNumber": 72,
+              "covered": true
+            },
+            {
+              "lineNumber": 75,
+              "covered": true
+            },
+            {
+              "lineNumber": 131,
+              "covered": true
+            },
+            {
+              "lineNumber": 52,
+              "covered": true
+            },
+            {
+              "lineNumber": 55,
+              "covered": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
