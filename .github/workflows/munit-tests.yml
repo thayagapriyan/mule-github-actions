@@ -1,0 +1,173 @@
+name: Run MUnit Tests
+
+on:
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch name to test'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  munit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+      - name: Set up JDK17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: 17
+      - name: Run MUnit Tests
+        id: munit
+        run: |
+          mvn test --file pom.xml \
+            -s .maven/settings.xml \
+            -Dmule.client.id="${{ secrets.CONNECTED_APP_ID }}" \
+            -Dmule.client.secret="${{ secrets.CONNECTED_APP_SECRET }}" \
+            2>&1 | tee munit-output.log
+          
+          # Extract test results
+          echo "Extracting test results..."
+      - name: Parse Test Results
+        if: always()
+        id: results
+        run: |
+          # Find and parse surefire reports
+          REPORT_DIR="target/surefire-reports"
+          
+          if [ -d "$REPORT_DIR" ]; then
+            # Count tests from XML reports
+            TESTS_RUN=0
+            TESTS_PASSED=0
+            TESTS_FAILED=0
+            TESTS_ERRORS=0
+            TESTS_SKIPPED=0
+            
+            for xml in $REPORT_DIR/*.xml; do
+              if [ -f "$xml" ]; then
+                tests=$(grep -oP 'tests="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo "0")
+                failures=$(grep -oP 'failures="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo "0")
+                errors=$(grep -oP 'errors="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo "0")
+                skipped=$(grep -oP 'skipped="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo "0")
+                
+                TESTS_RUN=$((TESTS_RUN + tests))
+                TESTS_FAILED=$((TESTS_FAILED + failures))
+                TESTS_ERRORS=$((TESTS_ERRORS + errors))
+                TESTS_SKIPPED=$((TESTS_SKIPPED + skipped))
+              fi
+            done
+            
+            TESTS_PASSED=$((TESTS_RUN - TESTS_FAILED - TESTS_ERRORS - TESTS_SKIPPED))
+            
+            # Calculate percentage
+            if [ $TESTS_RUN -gt 0 ]; then
+              PASS_PERCENT=$((TESTS_PASSED * 100 / TESTS_RUN))
+            else
+              PASS_PERCENT=0
+            fi
+            
+            echo "tests_run=$TESTS_RUN" >> $GITHUB_OUTPUT
+            echo "tests_passed=$TESTS_PASSED" >> $GITHUB_OUTPUT
+            echo "tests_failed=$TESTS_FAILED" >> $GITHUB_OUTPUT
+            echo "tests_errors=$TESTS_ERRORS" >> $GITHUB_OUTPUT
+            echo "tests_skipped=$TESTS_SKIPPED" >> $GITHUB_OUTPUT
+            echo "pass_percent=$PASS_PERCENT" >> $GITHUB_OUTPUT
+          else
+            echo "tests_run=0" >> $GITHUB_OUTPUT
+            echo "tests_passed=0" >> $GITHUB_OUTPUT
+            echo "tests_failed=0" >> $GITHUB_OUTPUT
+            echo "tests_errors=0" >> $GITHUB_OUTPUT
+            echo "tests_skipped=0" >> $GITHUB_OUTPUT
+            echo "pass_percent=0" >> $GITHUB_OUTPUT
+          fi
+      - name: Create Test Summary
+        if: always()
+        run: |
+          TESTS_RUN=${{ steps.results.outputs.tests_run }}
+          TESTS_PASSED=${{ steps.results.outputs.tests_passed }}
+          TESTS_FAILED=${{ steps.results.outputs.tests_failed }}
+          TESTS_ERRORS=${{ steps.results.outputs.tests_errors }}
+          TESTS_SKIPPED=${{ steps.results.outputs.tests_skipped }}
+          PASS_PERCENT=${{ steps.results.outputs.pass_percent }}
+          
+          # Determine status emoji and color
+          if [ "$TESTS_FAILED" -eq 0 ] && [ "$TESTS_ERRORS" -eq 0 ]; then
+            STATUS="✅ PASSED"
+            BADGE_COLOR="brightgreen"
+          else
+            STATUS="❌ FAILED"
+            BADGE_COLOR="red"
+          fi
+          
+          echo "## 🧪 MUnit Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Overall Status: $STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Progress bar
+          echo "### 📊 Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Pass Rate: ${PASS_PERCENT}%**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Create visual progress bar
+          FILLED=$((PASS_PERCENT / 5))
+          EMPTY=$((20 - FILLED))
+          BAR=""
+          for i in $(seq 1 $FILLED); do BAR="${BAR}█"; done
+          for i in $(seq 1 $EMPTY); do BAR="${BAR}░"; done
+          echo "\`[$BAR]\` ${PASS_PERCENT}%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📈 Test Statistics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Count | Percentage |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ✅ **Passed** | $TESTS_PASSED | ${PASS_PERCENT}% |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ $TESTS_RUN -gt 0 ]; then
+            FAIL_PERCENT=$((TESTS_FAILED * 100 / TESTS_RUN))
+            ERROR_PERCENT=$((TESTS_ERRORS * 100 / TESTS_RUN))
+            SKIP_PERCENT=$((TESTS_SKIPPED * 100 / TESTS_RUN))
+          else
+            FAIL_PERCENT=0
+            ERROR_PERCENT=0
+            SKIP_PERCENT=0
+          fi
+          
+          echo "| ❌ **Failed** | $TESTS_FAILED | ${FAIL_PERCENT}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⚠️ **Errors** | $TESTS_ERRORS | ${ERROR_PERCENT}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏭️ **Skipped** | $TESTS_SKIPPED | ${SKIP_PERCENT}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📊 **Total** | $TESTS_RUN | 100% |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📋 Details" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`$GITHUB_REF_NAME\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${GITHUB_SHA::7}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered By** | $GITHUB_ACTOR |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Workflow** | $GITHUB_WORKFLOW |" >> $GITHUB_STEP_SUMMARY
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: munit-reports
+          path: |
+            target/surefire-reports/
+            target/munit-reports/
+          if-no-files-found: ignore
