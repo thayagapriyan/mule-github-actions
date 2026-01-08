@@ -1,0 +1,89 @@
+name: Create Release Branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch name (without prefix)'
+        required: true
+        type: string
+      branch_type:
+        description: 'Branch type'
+        required: true
+        type: choice
+        options:
+          - release
+          - hotfix
+
+jobs:
+  create-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Create Branch and Update Version
+        run: |
+          BRANCH_TYPE="${{ github.event.inputs.branch_type }}"
+          BRANCH_NAME="${{ github.event.inputs.branch_name }}"
+          NEW_BRANCH="${BRANCH_TYPE}/${BRANCH_NAME}"
+          
+          echo "Creating branch: $NEW_BRANCH"
+          
+          # Create new branch
+          git checkout -b "$NEW_BRANCH"
+          
+          # Get current version from pom.xml
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Remove -SNAPSHOT if present
+          BASE_VERSION=$(echo "$CURRENT_VERSION" | sed 's/-SNAPSHOT//')
+          
+          # Split version into parts
+          MAJOR=$(echo "$BASE_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$BASE_VERSION" | cut -d. -f3)
+          
+          if [ "$BRANCH_TYPE" == "release" ]; then
+            # Increment minor version for release, reset patch to 0
+            NEW_MINOR=$((MINOR + 1))
+            NEW_VERSION="${MAJOR}.${NEW_MINOR}.0-SNAPSHOT"
+          else
+            # Increment patch version for hotfix
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}-SNAPSHOT"
+          fi
+          
+          echo "New version: $NEW_VERSION"
+          
+          # Update pom.xml version
+          mvn versions:set -DnewVersion="$NEW_VERSION" -DgenerateBackupPoms=false
+          
+          # Commit changes
+          git add pom.xml
+          git commit -m "chore: update version to $NEW_VERSION for $BRANCH_TYPE branch"
+          
+          # Push branch
+          git push origin "$NEW_BRANCH"
+          
+          echo "✅ Branch $NEW_BRANCH created with version $NEW_VERSION"
+      
+      - name: Create Summary
+        run: |
+          echo "## 🌿 Branch Created Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---------|:------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📁 Branch Type | \`${{ github.event.inputs.branch_type }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌿 Branch Name | \`${{ github.event.inputs.branch_type }}/${{ github.event.inputs.branch_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔖 New Version | Check pom.xml |" >> $GITHUB_STEP_SUMMARY
+          echo "| 👤 Created By | @$GITHUB_ACTOR |" >> $GITHUB_STEP_SUMMARY
