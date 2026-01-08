@@ -38,8 +38,8 @@
 						<environment>Sandbox</environment>
 						<target>Cloudhub-US-East-2</target>
 						<muleVersion>4.9.12</muleVersion>
-						<connectedAppClientId>721212fa005b4b259cdad946a58a6153</connectedAppClientId>
-						<connectedAppClientSecret>8158142C45E6430CAbdBa1D1f2B26dC2</connectedAppClientSecret>
+						<connectedAppClientId>${client.id}</connectedAppClientId>
+						<connectedAppClientSecret>${client.secret}</connectedAppClientSecret>
 						<connectedAppGrantType>client_credentials</connectedAppGrantType>
 						<applicationName>mule-github-actions</applicationName>
 						<replicas>1</replicas>
@@ -48,8 +48,6 @@
 							<http>
 								<inbound>
 									<publicUrl>https://github-actions.mulesoft.com</publicUrl>
-									<forwardSslSession>true</forwardSslSession>
-									<lastMileSecurity>true</lastMileSecurity>
 								</inbound>
 							</http>
 						</deploymentSettings>
