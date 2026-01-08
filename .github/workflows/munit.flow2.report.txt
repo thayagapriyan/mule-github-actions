@@ -1,0 +1,10 @@
+SUCCESS - Test aip-dcr-interceptor-exp-api-http-notfound-error finished Successfully.
+SUCCESS - Test aip-dcr-interceptor-exp-api-apikit-badrequest-error finished Successfully.
+SUCCESS - Test aip-dcr-interceptor-exp-api-apikit-notfound-error finished Successfully.
+SUCCESS - Test aip-dcr-interceptor-exp-api-apikit-method-notallowed-error finished Successfully.
+SUCCESS - Test aip-dcr-interceptor-exp-api-any-error finished Successfully.
+SUCCESS - Test aip-dcr-interceptor-exp-api-http-badrequest-error finished Successfully.
+
+=============================================================================
+Tests run: 6 - Failures: 0 - Errors: 0 - Skipped: 0 - Time elapsed: 0.453 sec
+=============================================================================
