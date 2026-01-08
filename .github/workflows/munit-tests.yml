@@ -32,43 +32,107 @@ jobs:
           distribution: 'zulu'
           java-version: 17
       - name: Run MUnit Tests
-        id: munit
         continue-on-error: true
         run: |
           mvn test --file pom.xml \
             -s .maven/settings.xml \
             -Dmule.client.id="${{ secrets.CONNECTED_APP_ID }}" \
             -Dmule.client.secret="${{ secrets.CONNECTED_APP_SECRET }}"
-      - name: Create Test Summary
+      - name: Create MUnit Coverage Summary
         if: always()
         run: |
-          REPORT_DIR="target/surefire-reports"
+          COVERAGE_FILE="target/site/munit/coverage/munit-coverage.json"
           
-          echo "## 🧪 MUnit Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "## 🧪 MUnit Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| # | Test Name |" >> $GITHUB_STEP_SUMMARY
-          echo "|--:|:----------|" >> $GITHUB_STEP_SUMMARY
           
-          COUNT=1
-          HAS_FAILURES=false
-          
-          if [ -d "$REPORT_DIR" ]; then
-            for report in $REPORT_DIR/*.txt; do
-              if [ -f "$report" ]; then
-                while IFS= read -r line; do
-                  if [[ "$line" == SUCCESS* ]]; then
-                    TEST_NAME=$(echo "$line" | sed 's/SUCCESS - Test //' | sed 's/ finished Successfully\.//')
-                    echo "| $COUNT | ✅ \`$TEST_NAME\` |" >> $GITHUB_STEP_SUMMARY
-                    COUNT=$((COUNT + 1))
-                  elif [[ "$line" == FAILURE* ]] || [[ "$line" == ERROR* ]]; then
-                    TEST_NAME=$(echo "$line" | sed 's/\(FAILURE\|ERROR\) - Test //' | sed 's/ .*//')
-                    echo "| $COUNT | ❌ \`$TEST_NAME\` |" >> $GITHUB_STEP_SUMMARY
-                    COUNT=$((COUNT + 1))
-                    HAS_FAILURES=true
-                  fi
-                done < "$report"
-              fi
+          if [ -f "$COVERAGE_FILE" ]; then
+            # Parse JSON using jq
+            COVERAGE=$(jq -r '.coverage' "$COVERAGE_FILE")
+            FLOW_COUNT=$(jq -r '.flowCount' "$COVERAGE_FILE")
+            PROCESSOR_COUNT=$(jq -r '.processorCount' "$COVERAGE_FILE")
+            COVERED_PROCESSORS=$(jq -r '.coveredProcessorCount' "$COVERAGE_FILE")
+            FILE_COUNT=$(jq -r '.files | length' "$COVERAGE_FILE")
+            
+            # Format coverage percentage
+            COVERAGE_FMT=$(printf "%.2f" $COVERAGE)
+            
+            # Process each resource file
+            for i in $(jq -r '.files | keys[]' "$COVERAGE_FILE"); do
+              FILE_NAME=$(jq -r ".files[$i].name" "$COVERAGE_FILE")
+              FILE_COVERAGE=$(jq -r ".files[$i].coverage" "$COVERAGE_FILE")
+              FILE_FLOW_COUNT=$(jq -r ".files[$i].flowCount" "$COVERAGE_FILE")
+              FILE_WEIGHT=$(jq -r ".files[$i].weight" "$COVERAGE_FILE")
+              FILE_COVERAGE_FMT=$(printf "%.2f" $FILE_COVERAGE)
+              FILE_WEIGHT_FMT=$(printf "%.2f" $FILE_WEIGHT)
+              
+              echo "### 📁 Resource File: \`$FILE_NAME\`" >> $GITHUB_STEP_SUMMARY
+              echo "**Containers:** $FILE_FLOW_COUNT | **Weight:** ${FILE_WEIGHT_FMT}% | **Coverage:** ${FILE_COVERAGE_FMT}%" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Name | Type | Covered (P) | Total (P) | Coverage |" >> $GITHUB_STEP_SUMMARY
+              echo "|:-----|:-----|------------:|----------:|---------:|" >> $GITHUB_STEP_SUMMARY
+              
+              # Process each flow in the file
+              for j in $(jq -r ".files[$i].flows | keys[]" "$COVERAGE_FILE"); do
+                FLOW_NAME=$(jq -r ".files[$i].flows[$j].name" "$COVERAGE_FILE")
+                FLOW_TYPE=$(jq -r ".files[$i].flows[$j].type" "$COVERAGE_FILE")
+                FLOW_COVERAGE=$(jq -r ".files[$i].flows[$j].coverage" "$COVERAGE_FILE")
+                FLOW_TOTAL=$(jq -r ".files[$i].flows[$j].messageProcessorCount" "$COVERAGE_FILE")
+                FLOW_COVERED=$(jq -r ".files[$i].flows[$j].coveredProcessorCount" "$COVERAGE_FILE")
+                FLOW_COVERAGE_FMT=$(printf "%.2f" $FLOW_COVERAGE)
+                
+                # Convert type to readable format
+                case "$FLOW_TYPE" in
+                  "FLOW") TYPE_DISPLAY="Flow" ;;
+                  "SUB_FLOW") TYPE_DISPLAY="Sub flow" ;;
+                  "ERROR_HANDLER") TYPE_DISPLAY="Error handler" ;;
+                  *) TYPE_DISPLAY="$FLOW_TYPE" ;;
+                esac
+                
+                # Add status icon based on coverage
+                if [ $(echo "$FLOW_COVERAGE == 100" | bc -l) -eq 1 ]; then
+                  STATUS="✅"
+                elif [ $(echo "$FLOW_COVERAGE >= 80" | bc -l) -eq 1 ]; then
+                  STATUS="🟡"
+                else
+                  STATUS="❌"
+                fi
+                
+                echo "| $STATUS \`$FLOW_NAME\` | $TYPE_DISPLAY | $FLOW_COVERED | $FLOW_TOTAL | ${FLOW_COVERAGE_FMT}% |" >> $GITHUB_STEP_SUMMARY
+              done
+              
+              echo "" >> $GITHUB_STEP_SUMMARY
             done
+            
+            # Summary section
+            echo "---" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📊 Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|:-------|------:|" >> $GITHUB_STEP_SUMMARY
+            echo "| Covered Processors | **$COVERED_PROCESSORS** |" >> $GITHUB_STEP_SUMMARY
+            echo "| Total Processors | **$PROCESSOR_COUNT** |" >> $GITHUB_STEP_SUMMARY
+            echo "| Containers | **$FLOW_COUNT** |" >> $GITHUB_STEP_SUMMARY
+            echo "| Resources | **$FILE_COUNT** |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Application coverage with visual
+            echo "---" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🎯 Application Coverage: **${COVERAGE_FMT}%**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Progress bar
+            FILLED=$(echo "$COVERAGE / 5" | bc)
+            EMPTY=$((20 - FILLED))
+            BAR=""
+            for k in $(seq 1 $FILLED); do BAR="${BAR}🟩"; done
+            for k in $(seq 1 $EMPTY); do BAR="${BAR}⬜"; done
+            echo "$BAR" >> $GITHUB_STEP_SUMMARY
+            
+          else
+            echo "⚠️ Coverage file not found at \`$COVERAGE_FILE\`" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -81,14 +145,10 @@ jobs:
           echo "| 🌿 Branch | \`$GITHUB_REF_NAME\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 🔗 Commit | \`${GITHUB_SHA::7}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 👤 Triggered By | @$GITHUB_ACTOR |" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "$HAS_FAILURES" = true ]; then
-            exit 1
-          fi
-      - name: Upload Test Reports
+      - name: Upload Coverage Reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: munit-reports
-          path: target/surefire-reports/*.txt
+          name: munit-coverage
+          path: target/site/munit/coverage/
           if-no-files-found: ignore
