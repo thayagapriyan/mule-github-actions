@@ -40,93 +40,14 @@ jobs:
             -Dmule.client.id="${{ secrets.CONNECTED_APP_ID }}" \
             -Dmule.client.secret="${{ secrets.CONNECTED_APP_SECRET }}"
       
-      # Step for SUCCESS - Show Coverage Report from JSON or fallback to txt files
-      - name: MUnit Summary (Success)
-        if: steps.munit.outcome == 'success'
-        run: |
-          COVERAGE_FILE="target/site/munit/coverage/munit-coverage.json"
-          REPORT_DIR="target/surefire-reports"
-          
-          echo "## ✅ MUnit Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Try JSON coverage file first
-          if [ -f "$COVERAGE_FILE" ]; then
-            COVERAGE=$(jq -r '.coverage' "$COVERAGE_FILE")
-            COVERAGE_FMT=$(printf "%.2f" $COVERAGE)
-            
-            echo "### 🎯 Application Coverage: **${COVERAGE_FMT}%**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            
-            # Process each resource file
-            for i in $(jq -r '.files | keys[]' "$COVERAGE_FILE"); do
-              FILE_NAME=$(jq -r ".files[$i].name" "$COVERAGE_FILE")
-              FILE_COVERAGE=$(jq -r ".files[$i].coverage" "$COVERAGE_FILE")
-              FILE_COVERAGE_FMT=$(printf "%.2f" $FILE_COVERAGE)
-              
-              echo "#### 📁 \`$FILE_NAME\` - Coverage: ${FILE_COVERAGE_FMT}%" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "| Name | Type | Covered | Total | Coverage |" >> $GITHUB_STEP_SUMMARY
-              echo "|:-----|:-----|--------:|------:|---------:|" >> $GITHUB_STEP_SUMMARY
-              
-              for j in $(jq -r ".files[$i].flows | keys[]" "$COVERAGE_FILE"); do
-                FLOW_NAME=$(jq -r ".files[$i].flows[$j].name" "$COVERAGE_FILE")
-                FLOW_TYPE=$(jq -r ".files[$i].flows[$j].type" "$COVERAGE_FILE")
-                FLOW_COVERAGE=$(jq -r ".files[$i].flows[$j].coverage" "$COVERAGE_FILE")
-                FLOW_TOTAL=$(jq -r ".files[$i].flows[$j].messageProcessorCount" "$COVERAGE_FILE")
-                FLOW_COVERED=$(jq -r ".files[$i].flows[$j].coveredProcessorCount" "$COVERAGE_FILE")
-                FLOW_COVERAGE_FMT=$(printf "%.2f" $FLOW_COVERAGE)
-                
-                case "$FLOW_TYPE" in
-                  "FLOW") TYPE_DISPLAY="Flow" ;;
-                  "SUB_FLOW") TYPE_DISPLAY="Sub flow" ;;
-                  "ERROR_HANDLER") TYPE_DISPLAY="Error handler" ;;
-                  *) TYPE_DISPLAY="$FLOW_TYPE" ;;
-                esac
-                
-                echo "| \`$FLOW_NAME\` | $TYPE_DISPLAY | $FLOW_COVERED | $FLOW_TOTAL | ${FLOW_COVERAGE_FMT}% |" >> $GITHUB_STEP_SUMMARY
-              done
-              echo "" >> $GITHUB_STEP_SUMMARY
-            done
-          
-          # Fallback to txt files if JSON not available
-          elif [ -d "$REPORT_DIR" ]; then
-            echo "### 📝 Test Results" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| # | Test Name | Status |" >> $GITHUB_STEP_SUMMARY
-            echo "|--:|:----------|:------:|" >> $GITHUB_STEP_SUMMARY
-            
-            COUNT=1
-            for report in $REPORT_DIR/*.txt; do
-              if [ -f "$report" ]; then
-                while IFS= read -r line; do
-                  if [[ "$line" == SUCCESS* ]]; then
-                    TEST_NAME=$(echo "$line" | sed 's/SUCCESS - Test //' | sed 's/ finished Successfully\.//')
-                    echo "| $COUNT | \`$TEST_NAME\` | ✅ |" >> $GITHUB_STEP_SUMMARY
-                    COUNT=$((COUNT + 1))
-                  fi
-                done < "$report"
-              fi
-            done
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|:---------|:------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 🌿 Branch | \`$GITHUB_REF_NAME\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔗 Commit | \`${GITHUB_SHA::7}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 👤 Triggered By | @$GITHUB_ACTOR |" >> $GITHUB_STEP_SUMMARY
-      
-      # Step for FAILURE - Show test results from txt files
-      - name: MUnit Summary (Failure)
-        if: steps.munit.outcome == 'failure'
+      - name: MUnit Summary
+        if: always()
         run: |
           REPORT_DIR="target/surefire-reports"
+          SUCCESS_COUNT=0
+          FAILED_COUNT=0
           
-          echo "## ❌ MUnit Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📝 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "## 🧪 MUnit Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| # | Test Name | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|--:|:----------|:------:|" >> $GITHUB_STEP_SUMMARY
@@ -140,21 +61,32 @@ jobs:
                     TEST_NAME=$(echo "$line" | sed 's/SUCCESS - Test //' | sed 's/ finished Successfully\.//')
                     echo "| $COUNT | \`$TEST_NAME\` | ✅ |" >> $GITHUB_STEP_SUMMARY
                     COUNT=$((COUNT + 1))
+                    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
                   elif [[ "$line" == FAILURE* ]] || [[ "$line" == ERROR* ]]; then
                     TEST_NAME=$(echo "$line" | sed 's/\(FAILURE\|ERROR\) - Test //' | sed 's/ .*//')
                     echo "| $COUNT | \`$TEST_NAME\` | ❌ |" >> $GITHUB_STEP_SUMMARY
                     COUNT=$((COUNT + 1))
+                    FAILED_COUNT=$((FAILED_COUNT + 1))
                   fi
                 done < "$report"
               fi
             done
           fi
           
+          TOTAL=$((SUCCESS_COUNT + FAILED_COUNT))
+          
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|:---------|:------|" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|:-------|------:|" >> $GITHUB_STEP_SUMMARY
+          echo "| ✅ Success | **$SUCCESS_COUNT** |" >> $GITHUB_STEP_SUMMARY
+          echo "| ❌ Failed | **$FAILED_COUNT** |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📊 Total | **$TOTAL** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
           echo "| 🌿 Branch | \`$GITHUB_REF_NAME\` |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---------|:------|" >> $GITHUB_STEP_SUMMARY
           echo "| 🔗 Commit | \`${GITHUB_SHA::7}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| 👤 Triggered By | @$GITHUB_ACTOR |" >> $GITHUB_STEP_SUMMARY
       
@@ -163,9 +95,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: munit-reports
-          path: |
-            target/site/munit/coverage/
-            target/surefire-reports/*.txt
+          path: target/surefire-reports/*.txt
           if-no-files-found: ignore
       
       - name: Fail if tests failed
