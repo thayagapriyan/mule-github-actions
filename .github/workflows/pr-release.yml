@@ -1,0 +1,146 @@
+name: PR to Release Branch
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - 'release/*'
+      - 'hotfix/*'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  version-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout source branch (PR branch) to get pom.xml version
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      # Step 2: Extract major and minor version from pom.xml
+      - name: Set up JDK17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
+      - name: Extract Version from POM
+        id: version
+        run: |
+          # Get current version from pom.xml
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Current version from pom.xml: $CURRENT_VERSION"
+          
+          # Remove -SNAPSHOT if present
+          BASE_VERSION=$(echo "$CURRENT_VERSION" | sed 's/-SNAPSHOT//')
+          
+          # Extract major and minor version
+          MAJOR=$(echo "$BASE_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
+          
+          echo "Major version: $MAJOR"
+          echo "Minor version: $MINOR"
+          
+          echo "major=$MAJOR" >> $GITHUB_OUTPUT
+          echo "minor=$MINOR" >> $GITHUB_OUTPUT
+
+      # Step 3: Call API to get current patch version from server
+      - name: Get Current Patch Version from Server
+        id: patch
+        run: |
+          MAJOR="${{ steps.version.outputs.major }}"
+          MINOR="${{ steps.version.outputs.minor }}"
+          
+          # TODO: Replace with actual API endpoint
+          # API_URL="https://your-server.com/api/version?major=${MAJOR}&minor=${MINOR}"
+          API_URL="${{ vars.VERSION_API_URL }}?major=${MAJOR}&minor=${MINOR}"
+          
+          echo "Calling API: $API_URL"
+          
+          # Make GET request and extract version from JSON response
+          RESPONSE=$(curl -s "$API_URL")
+          echo "API Response: $RESPONSE"
+          
+          CURRENT_PATCH=$(echo "$RESPONSE" | jq -r '.version')
+          echo "Current patch version from server: $CURRENT_PATCH"
+          
+          echo "patch=$CURRENT_PATCH" >> $GITHUB_OUTPUT
+
+      # Step 4: Checkout release branch and update version
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Increment Patch and Update POM
+        id: new_version
+        run: |
+          MAJOR="${{ steps.version.outputs.major }}"
+          MINOR="${{ steps.version.outputs.minor }}"
+          CURRENT_PATCH="${{ steps.patch.outputs.patch }}"
+          
+          # Increment patch by one
+          NEW_PATCH=$((CURRENT_PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Update pom.xml version
+          mvn versions:set -DnewVersion="$NEW_VERSION" -DgenerateBackupPoms=false
+          
+          # Show updated version
+          echo "Updated pom.xml to version: $NEW_VERSION"
+
+      # Step 5: Build and Deploy
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build with Maven
+        run: |
+          mvn -B package --file pom.xml -DskipMunitTests \
+            -s .maven/settings.xml \
+            -Dmule.client.id="${{ secrets.CONNECTED_APP_ID }}" \
+            -Dmule.client.secret="${{ secrets.CONNECTED_APP_SECRET }}"
+
+      - name: Deploy to Server
+        run: |
+          mvn deploy -DskipMunitTests -DmuleDeploy \
+            -s .maven/settings.xml \
+            -Dmule.client.id="${{ secrets.CONNECTED_APP_ID }}" \
+            -Dmule.client.secret="${{ secrets.CONNECTED_APP_SECRET }}" \
+            -Dclient.id="${{ secrets.CONNECTED_APP_ID }}" \
+            -Dclient.secret="${{ secrets.CONNECTED_APP_SECRET }}"
+
+      - name: Create Deployment Summary
+        run: |
+          echo "## 🚀 PR to Release Branch Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Version Details" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Source Branch** | \`${{ github.head_ref }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target Branch** | \`${{ github.base_ref }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Original Version** | \`${{ steps.version.outputs.major }}.${{ steps.version.outputs.minor }}.${{ steps.patch.outputs.patch }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **New Version** | \`${{ steps.new_version.outputs.new_version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered By** | @$GITHUB_ACTOR |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Status" >> $GITHUB_STEP_SUMMARY
+          echo "- Version incremented: Patch **${{ steps.patch.outputs.patch }}** → **$((${{ steps.patch.outputs.patch }} + 1))**" >> $GITHUB_STEP_SUMMARY
+          echo "- POM updated and deployed successfully" >> $GITHUB_STEP_SUMMARY
