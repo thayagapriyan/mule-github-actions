@@ -8,10 +8,10 @@
             <username>~~~Client~~~</username>
             <password>${mule.client.id}~?~${mule.client.secret}</password>
         </server>
-        <!-- <server>
+        <server>
             <id>anypoint-exchange-v3</id>
             <username>~~~Client~~~</username>
             <password>${mule.client.id}~?~${mule.client.secret}</password>
-        </server> -->
+        </server>
     </servers>
 </settings>
