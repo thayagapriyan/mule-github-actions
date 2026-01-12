@@ -71,40 +71,61 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
-      - name: Checkout main branch
+      # Step 1: Merge the PR to target branch
+      - name: Merge Pull Request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              merge_method: 'merge'
+            });
+            console.log('PR merged successfully');
+      
+      # Step 2: Checkout the target branch after merge
+      - name: Checkout target branch
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.base_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Pull latest changes
+        run: git pull origin ${{ github.base_ref }}
+      
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Add SNAPSHOT and Update Version
+      
+      # Step 3: Update version to SNAPSHOT
+      - name: Update Version to SNAPSHOT
         id: version
         run: |
           # Get current version from pom.xml
           CURRENT_VERSION=$(grep -m1 '<version>' pom.xml | sed 's/.*<version>\(.*\)<\/version>.*/\1/')
           echo "Current version: $CURRENT_VERSION"
           
-          # Add -SNAPSHOT suffix if not present
-          if [[ "$CURRENT_VERSION" != *"-SNAPSHOT"* ]]; then
-            SNAPSHOT_VERSION="${CURRENT_VERSION}-SNAPSHOT"
-          else
-            SNAPSHOT_VERSION="$CURRENT_VERSION"
-          fi
+          # Remove existing -SNAPSHOT if present, then add it fresh
+          BASE_VERSION=$(echo "$CURRENT_VERSION" | sed 's/-SNAPSHOT//')
+          SNAPSHOT_VERSION="${BASE_VERSION}-SNAPSHOT"
           echo "Snapshot version: $SNAPSHOT_VERSION"
           
           # Update pom.xml with snapshot version
           sed -i "s|<version>$CURRENT_VERSION</version>|<version>$SNAPSHOT_VERSION</version>|" pom.xml
           
           echo "snapshot_version=$SNAPSHOT_VERSION" >> $GITHUB_OUTPUT
+      
+      # Step 4: Commit version change
       - name: Commit Version Change
         run: |
           git add pom.xml
           git commit -m "chore: update version to ${{ steps.version.outputs.snapshot_version }}"
-          git push origin main
+          git push origin ${{ github.base_ref }}
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
