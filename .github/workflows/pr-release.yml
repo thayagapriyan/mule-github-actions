@@ -2,12 +2,14 @@ name: PR to Main Branch
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [closed]
     branches: [main]
     
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Only run if PR was merged (not just closed)
+    if: github.event.pull_request.merged == true
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v4
@@ -33,6 +35,7 @@ jobs:
   package:
     needs: build
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v4
@@ -69,33 +72,17 @@ jobs:
   deploy:
     needs: package
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     permissions:
       contents: write
-      pull-requests: write
     steps:
-      # Step 1: Merge the PR to target branch
-      - name: Merge Pull Request
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.pulls.merge({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-              merge_method: 'merge'
-            });
-            console.log('PR merged successfully');
-      
-      # Step 2: Checkout the target branch after merge
+      # PR is already merged at this point
       - name: Checkout target branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.base_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-      
-      - name: Pull latest changes
-        run: git pull origin ${{ github.base_ref }}
       
       - name: Configure Git
         run: |
