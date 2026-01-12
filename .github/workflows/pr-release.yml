@@ -73,15 +73,21 @@ jobs:
     needs: package
     runs-on: ubuntu-latest
     if: github.event.pull_request.merged == true
-    permissions:
-      contents: write
     steps:
+      # Generate GitHub App token for bypassing branch protection
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      
       # PR is already merged at this point
       - name: Checkout target branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.base_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
       
       - name: Configure Git
