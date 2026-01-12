@@ -73,6 +73,7 @@ jobs:
     needs: package
     runs-on: ubuntu-latest
     if: github.event.pull_request.merged == true
+    environment: production  # Secrets only accessible from protected branches
     steps:
       # Generate GitHub App token for bypassing branch protection
       - name: Generate GitHub App Token
